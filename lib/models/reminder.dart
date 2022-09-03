@@ -1,7 +1,7 @@
 class Reminder {
-  final String id;
-  final int dateAndTime;
+  final int? id;
+  final int? medicineID;
+  final String dateAndTime;
   final String hasBeenTaken;
-
-  Reminder( {required this.id, required this.dateAndTime,  required this.hasBeenTaken});
+  Reminder( {this.id, this.medicineID, required this.dateAndTime,  required this.hasBeenTaken});
 }

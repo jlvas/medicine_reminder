@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:medicine_reminder_list/screens/add_medicine_screen.dart';
+import './screens/add_medicine_screen.dart';
+import './screens/payload_screen.dart';
+import './screens/set_medicine_time.dart';
 import 'package:provider/provider.dart';
 
 import './providers/medicine_data.dart';
@@ -8,14 +10,36 @@ import 'screens/medicine_details_screen.dart';
 import 'utilities/notification_api.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  NotificationApi.init(); // intialize the notification
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    NotificationApi.init(initSchedule: true);
+    super.initState();
+  }
+
+  void listenNotification() {
+    NotificationApi.onNotifications.stream.listen(onClickNotification);
+  }
+
+  void onClickNotification(String? payload){
+    Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => PayloadScreen(payload: payload),
+        )
+    );
+  }
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
@@ -30,6 +54,7 @@ class MyApp extends StatelessWidget {
         routes:{
           AddMedicineScreen.routeName:(ctx)=> AddMedicineScreen(),
           MedicineDetailsScreen.routeName:(ctx) => MedicineDetailsScreen(),
+          SetMedicineTime.routeName:(ctx) => SetMedicineTime(),
         }
       ),
     );

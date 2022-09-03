@@ -1,10 +1,12 @@
 import 'dart:developer';
 import 'dart:io';
 
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:medicine_reminder_list/screens/add_medicine_screen.dart';
 import 'package:medicine_reminder_list/screens/medicine_details_screen.dart';
 import 'package:medicine_reminder_list/screens/payload_screen.dart';
+import 'package:medicine_reminder_list/utilities/awesome_notification_api.dart';
 import 'package:medicine_reminder_list/utilities/notification_api.dart';
 import 'package:provider/provider.dart';
 
@@ -18,30 +20,25 @@ class MedicineListScreen extends StatefulWidget {
 }
 
 class _MedicineListScreenState extends State<MedicineListScreen> {
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    listenNotifications();
+  }
 
-  // @override
-  // void initState()
-  // {
-  //   NotificationApi.init();
-  //   // listenNotifications();
-  //   super.initState();
-  // }
-
-  void listenNotifications()
-  {
+  void listenNotifications() {
     NotificationApi.onNotifications.stream.listen(onClickedNotification);
   }
 
-  void onClickedNotification(String? payload)
-  {
+  void onClickedNotification(String? payload) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context)=>PayloadScreen(payload: payload)),
+      MaterialPageRoute(builder: (context) => PayloadScreen(payload: payload)),
     );
   }
 
   @override
-  Widget build(BuildContext context)
-  {
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Medicine List'),
@@ -53,52 +50,46 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
             icon: const Icon(Icons.add),
           ),
           IconButton(
-            onPressed: () {
-              // Provider.of<MedicineData>(context, listen: false).fetchAndSetMedicine();
-              // Navigator.pushNamed(context, MedicineDetailsScreen.routeName);
-              // NotificationApi.showScheduleNotification(
-              //     title: 'schedule notification',
-              //     body: 'Body for schedule notification',
-              //     payload: 'Payload',
-              //     scheduleDate: DateTime.now().add(Duration(seconds: 12))
-              // );
-            },
+            onPressed: () {},
             icon: const Icon(Icons.folder_open),
           ),
+          ElevatedButton(
+              onPressed: () {},
+              child: const Text('test'))
         ],
       ),
       body: FutureBuilder(
-        future: Provider.of<MedicineData>(context, listen: false).fetchAndSetMedicine(),
-        builder: (context, data){
-          if(data.connectionState == ConnectionState.waiting)
-          {
+        future: Provider.of<MedicineData>(context, listen: false)
+            .fetchAndSetMedicine(),
+        builder: (context, data) {
+          if (data.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(),
             );
-          }
-          else {
+          } else {
             return Consumer<MedicineData>(
               child: const Center(
                 child: Text('There is no list'),
               ),
               builder: (ctx, medicineData, ch) {
-                if(medicineData.items.isEmpty){
+                if (medicineData.items.isEmpty) {
                   // log('MedicineListScreen.build.FutureBuilder.else.medicineData isEmpty: ${medicineData.items.isEmpty}');
                   return ch!;
-                }
-                else
-                {
+                } else {
                   return ListView.builder(
                     itemCount: medicineData.items.length,
-                    itemBuilder: (ctx, index){
+                    itemBuilder: (ctx, index) {
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundImage: FileImage(medicineData.items[index].imagePath),
+                          backgroundImage:
+                              FileImage(medicineData.items[index].imagePath),
                         ),
                         title: Text(medicineData.items[index].name),
                         subtitle: Text(medicineData.items[index].desc),
-                        onTap: (){
-                          Navigator.pushNamed(context, MedicineDetailsScreen.routeName, arguments: medicineData.items[index]);
+                        onTap: () {
+                          Navigator.pushNamed(
+                              context, MedicineDetailsScreen.routeName,
+                              arguments: medicineData.items[index]);
                         },
                       );
                     },

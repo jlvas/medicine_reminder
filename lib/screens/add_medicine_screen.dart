@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:medicine_reminder_list/screens/payload_screen.dart';
+import 'package:medicine_reminder_list/screens/set_medicine_time.dart';
 import 'package:medicine_reminder_list/widgets/days_and_times.dart';
 import 'package:provider/provider.dart';
 
@@ -21,17 +22,16 @@ class AddMedicineScreen extends StatefulWidget {
 
 class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final _key = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
+  final _medicineNameController = TextEditingController();
   final _descController = TextEditingController();
   final _countDays = TextEditingController();
   final _countTimes = TextEditingController();
   final _startHour = TextEditingController();
-  final _startMinut = TextEditingController();
+ List<TimeOfDay?> pickedHoursPerDay =[];
 
   File? _pickedImagePath;
   @override
-  Widget build(BuildContext context)
-  {
+  Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
           title: const Text('add a new medicine'),
@@ -47,80 +47,68 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     child: Column(
                       children: [
                         ImageInput(_selectedImage),
+
+                        /// Medicine Name
                         TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Field is required';
                           },
                           decoration: const InputDecoration(
-                            labelText: 'Title',
+                            labelText: 'Medicine Name',
                           ),
-                          controller: _titleController,
+                          controller: _medicineNameController,
                         ),
+
+                        ///Medicine Description
                         TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Field is required';
                           },
                           decoration: const InputDecoration(
                             labelText: 'Description',
                           ),
                           controller: _descController,
                         ),
+
+                        ///Count Days
                         TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Field is required';
                           },
                           keyboardType: TextInputType.number,
                           controller: _countDays,
-                          decoration: InputDecoration(
-                            labelText: 'Count Days'
-                          ),
+                          decoration:
+                              const InputDecoration(labelText: 'Count Days'),
                         ),
+
+                        /// how many time per day
                         TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Field is required';
                           },
                           keyboardType: TextInputType.number,
                           controller: _countTimes,
                           decoration: const InputDecoration(
-                            labelText: 'Count Times per Day'
-                          ),
-                        ),
-
-                        TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
-                          },
-                          keyboardType: TextInputType.number,
-                          controller: _startHour,
-                          decoration: const InputDecoration(
-                              labelText: 'When to start'
-                          ),
-                        ),
-                        TextFormField(
-                          validator: (value){
-                            if(value!.isEmpty)return 'Field is required';
-                          },
-                          keyboardType: TextInputType.number,
-                          controller: _startMinut,
-                          decoration: const InputDecoration(
-                              labelText: 'When to start'
-                          ),
+                              labelText: 'Count Times per Day'),
                         ),
                       ],
                     ),
                   ),
                 ),
+
+                // Setup Time
                 ElevatedButton(
-                  onPressed: (){
-                    // NotificationApi.showScheduleNotification(
-                    //     title: 'schedule notification',
-                    //     body: 'Body for schedule notification',
-                    //     payload: 'Payload',
-                    //     scheduleDate: DateTime.now().add(Duration(seconds: 12))
-                    // );
-                    if(_key.currentState!.validate())_saveMedicine();
+                    onPressed: () async{
+                      pickedHoursPerDay = await Navigator.pushNamed(context, SetMedicineTime.routeName, arguments: _countTimes.text) as List<TimeOfDay?>;
+                      // pickedHoursPerDay = list as List<TimeOfDay?>;
+                      // print("List: ${list.runtimeType}");
+                    },
+                    child: Text('Set Time')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_key.currentState!.validate() && pickedHoursPerDay!.isNotEmpty) _saveMedicine();
                   },
-                  child: Text('+ Add Medicine'),
+                  child: const Text('+ Add Medicine'),
                 ),
               ],
             ),
@@ -128,23 +116,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ));
   }
 
-  void _selectedImage(File pickedImagePath)
-  {
+  void _selectedImage(File pickedImagePath) {
     log('AddMedicineScreen._selectedImage');
     _pickedImagePath = pickedImagePath;
   }
 
-  void _saveMedicine()
-  {
-    if(_titleController.text.isEmpty)return;
+  void _saveMedicine() {
+    if (_medicineNameController.text.isEmpty) return;
     Provider.of<MedicineData>(context, listen: false).addMedicine(
       pickedDesc: _descController.text,
-      pickedName: _titleController.text,
+      pickedName: _medicineNameController.text,
       pickedImagePath: _pickedImagePath!,
       pickedCountDays: _countDays.text,
-      pickedCountTimes: _countTimes.text,
-      pickedStartHour: _startHour.text,
-      pickedStartMinut: _startMinut.text,
+      pickedHoursPerDay: pickedHoursPerDay,
     );
     Navigator.pop(context);
   }

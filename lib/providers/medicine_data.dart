@@ -8,105 +8,88 @@ import '../models/reminder.dart';
 import '../utilities/notification_api.dart';
 
 class MedicineData with ChangeNotifier {
-  static const String _medicineTable = 'medicine_list';
-  static const String _reminderTable = 'reminder_list';
-  static const String _createMedicineTable =
-      'CREATE TABLE $_medicineTable(id TEXT PRIMARY KEY, name TEXT, desc TEXT, imagePath TEXT, countDays TEXT, countTimes TEXT, startHour TEXT)';
-  static const String _createReminderTable =
-      'CREATE TABLE $_reminderTable(id TEXT, dateAndTime INTEGER, hasBeenTaken TEXT)';
-
   List<Medicine> _items = [];
   List<Reminder> _listReminder = [];
 
   /// by using the 3 dots, it will return a copy of the list not the original list
   /// reason: original list should not be changed from outside this class
-  List<Medicine> get items
-  {
+  List<Medicine> get items {
     return [..._items];
   }
 
-  List<Reminder> get list
-  {
+  List<Reminder> get listReminder {
     return [..._listReminder];
   }
 
-  void addMReminder(Reminder reminder)
-  {
+  void addMReminder(Reminder reminder) {
     DBHelper.insert(
-      table: _reminderTable,
-      data: {'id': reminder.id, 'dateAndTime': reminder.dateAndTime, 'hasBeenTaken':reminder.hasBeenTaken},
-      createTable: _createReminderTable,);
+      table: DBHelper.reminderTable,
+      data: {
+        'id': reminder.id,
+        'dateAndTime': reminder.dateAndTime,
+        'hasBeenTaken': reminder.hasBeenTaken
+      },
+      createTable: DBHelper.createReminderTable,
+    );
   }
 
-  void addMedicine(
-      {required String pickedDesc,
-      required String pickedName,
-      required File pickedImagePath,
-      required String pickedCountDays,
-      required String pickedCountTimes,
-      required String pickedStartHour,
-        required String pickedStartMinut,
-      })
-  {
-    final medicine = Medicine(
-      id: DateTime.now().toString(),
-      imagePath: pickedImagePath,
-      name: pickedName,
-      desc: pickedDesc,
-      countDays: pickedCountDays,
-      countTimes: pickedCountTimes,
-      startHour: pickedStartHour,
+  Future<void> addMedicine({
+    required String pickedDesc,
+    required String pickedName,
+    required File pickedImagePath,
+    required String pickedCountDays,
+    required List<TimeOfDay?> pickedHoursPerDay,
+  }) async {
+    /// insert medicine into a database
+    await DBHelper.insert(
+        table: DBHelper.medicineTable,
+        data: {
+          'name': pickedName,
+          'desc': pickedDesc,
+          'imagePath': pickedImagePath.path,
+          'countDays': pickedCountDays,
+          'countTimes': pickedHoursPerDay.length.toString(),
+        },
+        createTable: DBHelper.createMedicineTable
     );
+    final date = DateTime.now().day;
+    final month = DateTime.now().month;
+    final year = DateTime.now().year;
+    final medicineID = await DBHelper.getLastID(DBHelper.medicineTable, DBHelper.createMedicineTable);
+    log('medicineID = $medicineID');
 
-    final int hourDiff = 24~/int.parse(pickedCountTimes);
-    final int times = int.parse(pickedCountDays)* int.parse(pickedCountTimes);
-    final int startHour = int.parse(pickedStartHour);
-    // (DateTime.now().year, DateTime.now().month, DateTime.now().day , startHour,DateTime.now().minute)
-    final today = DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-      int.parse(pickedStartHour),
-      int.parse(pickedStartMinut),
-    );
-
-    int addingHour =0;
-
-    for(int i =0; i< times; i++)
-    {
-      final reminder = Reminder(
-          id: medicine.id,
-          dateAndTime: today.add(Duration(hours: addingHour)).millisecondsSinceEpoch,
-          hasBeenTaken: 'No',
-      );
-      addMReminder(reminder);
-      NotificationApi.showScheduleNotification(reminder: reminder,medicine: medicine);
-      addingHour+=hourDiff;
+    for (int i = 0; i < int.parse(pickedCountDays); i++) {
+      for (var selectedHour in pickedHoursPerDay) {
+        ///insert reminder
+        await DBHelper.insert(
+          table: DBHelper.reminderTable,
+          data: {
+            'medicineID': medicineID,
+            'dateAndTime': DateTime(year, month,date + i,  selectedHour!.hour, selectedHour.minute,0,0,0).millisecondsSinceEpoch.toString(),
+            'hasBeenTaken': 'false',
+          },
+          createTable: DBHelper.createReminderTable,
+        );
+      }
     }
 
-    _items.add(medicine);
-
-    DBHelper.insert(
-        createTable: _createMedicineTable,
-        table: _medicineTable,
-        data: {
-          'id': medicine.id,
-          'name': medicine.name,
-          'desc': medicine.desc,
-          'imagePath': medicine.imagePath.path,
-          'countDays': medicine.countDays,
-          'countTimes': medicine.countTimes,
-          'startHour': medicine.startHour,
-        });
-
-    log('MedicineData.addMedicine\n${medicine.imagePath.path}');
-    notifyListeners();
+    await fetchAndSetMedicine();
+    await fetchAndSetReminder();
+    var count =1;
+    for(var reminder in _listReminder){
+      if(reminder.medicineID == medicineID){
+        NotificationApi.scheduleNotification(name: pickedName, desc: pickedDesc, reminder: reminder, order: count);
+        count++;
+      }
+    }
+    // notifyListeners();
   }
 
-  Future<void> fetchAndSetMedicine() async
-  {
+  Future<void> fetchAndSetMedicine() async {
+    log('MedicineData.fetchAndSetMedicine()');
     final dataList = await DBHelper.getData(
-        table: _medicineTable, createTable: _createMedicineTable);
+        table: DBHelper.medicineTable,
+        createTable: DBHelper.createMedicineTable);
     _items = dataList
         .map((e) => Medicine(
               id: e['id'],
@@ -115,57 +98,61 @@ class MedicineData with ChangeNotifier {
               desc: e['desc'],
               countDays: e['countDays'],
               countTimes: e['countTimes'],
-              startHour: e['startHour'],
             ))
         .toList();
     notifyListeners();
-    log('MedicineData.fetchAndSetMedicine');
-    _items.forEach((element) {
-      log('${element.imagePath}');
-    });
   }
 
-  Future<void> fetchAndSetReminder() async
-  {
+  Future<void> fetchAndSetReminder() async {
+    log('MedicineData.fetchAndSetReminder()');
     final dataList = await DBHelper.getData(
-        table: _reminderTable, createTable: _createReminderTable);
+        table: DBHelper.reminderTable,
+        createTable: DBHelper.createReminderTable);
     _listReminder = dataList
         .map((e) => Reminder(
-      id: e['id'],
-      dateAndTime: e['dateAndTime'],
-      hasBeenTaken: e['hasBeenTaken'],
-    ))
+              id: e['id'],
+              medicineID: e['medicineID'],
+              hasBeenTaken: e['hasBeenTaken'],
+              dateAndTime: e['dateAndTime'],
+            ))
         .toList();
     notifyListeners();
-    log('MedicineData.fetchAndSetMedicine');
-    _listReminder.forEach((element) {
-      log('${DateTime.fromMillisecondsSinceEpoch(element.dateAndTime)}');
-    });
   }
 
-  void deleteMedicine(String idMedicine) async
-  {
+  Future<Reminder> fetchAndSetReminderById(String reminderID) async {
+    log('MedicineData.fetchAndSetReminder()');
+    final reminderData = await DBHelper.getById(
+        table: DBHelper.reminderTable,
+        createTable: DBHelper.createReminderTable,
+        id: reminderID);
+    return Reminder(
+              id: reminderData['id'],
+              medicineID: reminderData['medicineID'],
+              dateAndTime: reminderData['dateAndTime'],
+              hasBeenTaken: reminderData['hasBeenTaken'],
+            );
+  }
+
+  void deleteMedicine(String idMedicine) async {
     await DBHelper.delete(
-        table: _medicineTable,
+        table: DBHelper.medicineTable,
         id: idMedicine,
-        createTable: _createMedicineTable);
+        createTable: DBHelper.createMedicineTable);
     fetchAndSetMedicine();
   }
 
-  void deleteReminder(String dateAndTime) async
-  {
+  void deleteReminder(String dateAndTime) async {
     await DBHelper.delete(
-        table: _medicineTable,
+        table: DBHelper.medicineTable,
         id: dateAndTime,
-        createTable: _createReminderTable);
+        createTable: DBHelper.createReminderTable);
     fetchAndSetMedicine();
   }
 
-  void editMedicine(Medicine medicine) async
-  {
+  void editMedicine(Medicine medicine) async {
     await DBHelper.update(
-      createTable: _createMedicineTable,
-      table: _medicineTable,
+      createTable: DBHelper.createMedicineTable,
+      table: DBHelper.medicineTable,
       data: {
         'id': medicine.id,
         'name': medicine.name,

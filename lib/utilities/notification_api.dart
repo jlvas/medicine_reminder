@@ -1,3 +1,6 @@
+import 'dart:developer';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -5,107 +8,73 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 
 import '../models/medicine.dart';
-import '../models/reminder.dart'; //show scheduled notifications
+import '../models/reminder.dart';
 
 class NotificationApi {
   static final _notification = FlutterLocalNotificationsPlugin();
-  static final onNotifications =
-      BehaviorSubject<String?>(); // it came from rxdart plugin
+  static final onNotifications = BehaviorSubject<String?>();
 
-  static Future<void> showNotification(
-      {int id = 2, String? title, String? body, String? payload}) async {
-    _notification.show(id, title, body, await _notificationDetails(),
-        payload: payload);
-  }
+  // it came from rxdart plugin
 
-  static Future<void> showScheduleNotification(
-      {
-        // int id = 2,
-        // String? title,
-        // String? body,
-        // String? payload,
-        // required DateTime scheduleDate
-        required Reminder reminder,
-        required Medicine medicine,
-      }) async {
-    _notification.zonedSchedule(
-      reminder.dateAndTime~/10000,
-      medicine.name,
-      medicine.desc,
-      // reminder.dateAndTime~/4,
-      // medicine.name,
-      // medicine.desc,
-      // tz.TZDateTime.from(DateTime.fromMillisecondsSinceEpoch(reminder.dateAndTime),tz.local),
-      tz.TZDateTime.from(DateTime.fromMillisecondsSinceEpoch(reminder.dateAndTime),tz.local),
-      await _notificationDetails(),
-      payload: medicine.name,
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime
-    );
-  }
 
-  static Future<void> scheduleNotificationDaily(
-      {int id = 2,
-        String? title,
-        String? body,
-        String? payload,
-        required DateTime scheduleDate}) async {
-    _notification.zonedSchedule(
-        id,
-        title,
-        body,
-        _scheduleDaily(Time(80)),
-        await _notificationDetails(),
-        payload: payload,
-        androidAllowWhileIdle: true,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,// schedule for every day. it could be done weekly as well
-    );
-  }
+  // static Future<void> showNotification({int id = 2, String? title, String? body, String? payload}) async {
+  //   _notification.show(id,
+  //       title,
+  //       body,
+  //       await _notificationDetails(),
+  //       payload: payload
+  //   );
+  // }
 
-  static tz.TZDateTime _scheduleDaily(Time time){
-    final now = tz.TZDateTime.now(tz.local); // current day time
-    final scheduledDate = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      time.hour,time.minute, time.second,
-    );
+  // static Future<void> showScheduleNotification({required Reminder reminder, required Medicine medicine,}) async
+  // {
+  //   _notification.periodicallyShow(
+  //       int.parse(reminder.dateAndTime)~/10000,
+  //       medicine.name,
+  //       medicine.desc ,
+  //       RepeatInterval.everyMinute,
+  //       await _notificationDetails()
+  //   );
+  //   _notification.zonedSchedule(
+  //     reminder.id!,
+  //     medicine.name,
+  //     medicine.desc,
+  //     tz.TZDateTime.from(DateTime.fromMillisecondsSinceEpoch(int.parse(reminder.dateAndTime)),tz.local),
+  //     await _notificationDetails(),
+  //     payload: '${reminder.medicineID}:${reminder.id}',// use the medicineID and reminder
+  //     androidAllowWhileIdle: true,
+  //     uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime
+  //   );
+  // }
 
-    return scheduledDate.isBefore(now) // check if it not on the past already
-        ? scheduledDate.add(Duration(days: 1))
-        : scheduledDate;
-  }
-
-  static Future<NotificationDetails> _notificationDetails() async {
-    return NotificationDetails(
+  static Future<NotificationDetails> _notificationDetails(
+      {required String id, required String name, required String desc}) async {
+    return const NotificationDetails(
       android: AndroidNotificationDetails(
-        'id',
-        'name',
-        channelDescription: 'description',
+        'channel ID',
+        'Medicine Reminder',
+        channelDescription: 'To remind user taking their medicine',
         importance: Importance.max,
+        priority: Priority.max,
         icon: '@drawable/ic_car_repair',
       ),
       iOS: IOSNotificationDetails(),
     );
   }
 
-  static Future<void> init({bool initSchedule = true}) // set the initSchedule to true to make code commented below working
-  async
+  static Future<void> init( {bool initSchedule = true}) async// set the initSchedule to true to make code commented below working
   {
-    tz.initializeTimeZones();// initialize the time zone.
-    final android = AndroidInitializationSettings('@drawable/ic_car_repair');
-    final iOS = IOSInitializationSettings();
-    final settings = InitializationSettings(
-      android: android,
-      iOS: iOS,
-    );
+
+    const android = AndroidInitializationSettings('@drawable/ic_car_repair');
+    const iOS = IOSInitializationSettings();
+    const settings = InitializationSettings(android: android, iOS: iOS,);
+
+    /// When app is closed
     final details = await _notification.getNotificationAppLaunchDetails();
-    if(details != null && details.didNotificationLaunchApp)
-    {
+    if(details != null && details.didNotificationLaunchApp){
       onNotifications.add(details.payload);
     }
+
     await _notification.initialize(
       settings,
       onSelectNotification: (payload) async {// each time a tap on the notification, this function will be executed
@@ -113,15 +82,26 @@ class NotificationApi {
       },
     );
 
-    ///The code below will schedule the notification to show up each 12 seconds
-    ///it will be scheduled automatically do to the fact it exists on init function which is
-    ///called in the first of initiating application
-    ///to initialize the schedule, need to set scheduleDate to true on the argument function
-    // NotificationApi.showScheduleNotification(
-    //   title: 'Title',
-    //   body: 'Body',
-    //   payload: 'Payload',
-    //   scheduleDate: DateTime.now().add(Duration(seconds: 12));
-    // );
+    if(initSchedule){
+      tz.initializeTimeZones();
+      final locationName = await FlutterNativeTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(locationName));
+    }
+  }
+
+  static void scheduleNotification({ required String name, required String desc, required Reminder reminder,required int order})async{
+    log('channel name: $name');
+    if(DateTime.fromMillisecondsSinceEpoch(int.parse(reminder.dateAndTime)).isBefore(DateTime.now()))return;
+    _notification.zonedSchedule(
+        reminder.id!,
+        '$name time# $order',
+        'Time: ${(DateTime.fromMillisecondsSinceEpoch(int.parse(reminder.dateAndTime)))}\n$desc',
+        tz.TZDateTime.from(DateTime.fromMillisecondsSinceEpoch(int.parse(reminder.dateAndTime)),tz.local),
+        await _notificationDetails(id: reminder.id.toString(), name: name, desc: desc),
+        payload: '${reminder.medicineID}:${reminder.id}',
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        androidAllowWhileIdle: true,
+    );
+    // _notification.periodicallyShow(id, title, body, RepeatInterval.everyMinute, await _notificationDetails());
   }
 }
